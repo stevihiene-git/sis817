@@ -10,7 +10,7 @@ import logging
 from datetime import timedelta
 
 # Create the core application instance and extensions
-app = Flask(__name__, template_folder='public')
+app = Flask(__name__, template_folder='templates')
 # app.config["SQLALCHEMY_DATABASE_URI"]= "postgresql://neondb_owner:npg_v7RP1oKYmFwM@ep-bold-mud-adroxeim-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 app.config["SQLALCHEMY_DATABASE_URI"]= "postgresql://neondb_owner:npg_0pkAG6wWIQej@ep-bold-mud-adroxeim-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
