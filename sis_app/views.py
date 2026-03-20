@@ -350,21 +350,32 @@ def admin_add_course():
 @views_bp.route('/student/dashboard')
 @login_required
 def student_dashboard():
-    if not validate_student_access():
-        return redirect(get_redirect_url())
-
-    student = Student.query.filter_by(user_id=current_user.id).first()
-    if not student:
-        flash('Student profile not found. Please contact administration.', 'error')
-        return redirect(url_for('auth.logout'))
-
+    if current_user.role != 'Student':
+        flash("Access denied.", "danger")
+        return redirect(url_for('views.dashboard'))
+    
+    from .models import is_financially_cleared, Payment
+    
+    # Get student record
+    student = current_user.student
+    
+    # Check financial clearance
+    is_cleared = is_financially_cleared(student.id)
+    
+    # Get recent payments
+    payments = Payment.query.filter_by(
+        student_id=student.id
+    ).order_by(Payment.date_paid.desc()).limit(10).all()
+    
     # Get registered courses
-    registrations = CourseRegistration.query.filter_by(student_id=student.id).all()
-    registered_courses = [reg.course for reg in registrations if reg.course]
-
+    registered_courses = [reg.course for reg in student.registrations]
+    
     return render_template('student_dashboard.html',
                          student=student,
-                         registered_courses=registered_courses)
+                         registered_courses=registered_courses,
+                         financial_cleared=is_cleared,
+                         balance=student.balance,  # ← This is what's missing!
+                         payments=payments)
 
 
 @views_bp.route('/student/register_course', methods=['GET', 'POST'])
@@ -686,25 +697,19 @@ def api_get_results():
 @views_bp.route('/dashboard')
 @login_required
 def dashboard():
-    # Check financial clearance for students
-    if current_user.role == 'Student':
-        from .models import is_financially_cleared
-        is_cleared = is_financially_cleared(current_user.student.id)
-        if not is_cleared:
-            flash("⚠️ Please settle your outstanding balance to access all features.", "warning")
-        
-        # Pass clearance status to template
-        return render_template('student_dashboard.html', 
-                             financial_cleared=is_cleared,
-                             balance=current_user.student.balance)
-    elif current_user.role == 'Admin':
-        return render_template('admin_dashboard.html')
-    elif current_user.role == 'Lecturer':
-        return render_template('lecturer_dashboard.html')
-    elif current_user.role == 'Finance':
-        return render_template('finance_dashboard.html')
+    # Redirect to role-specific dashboard
+    role_routes = {
+        'Student': 'views.student_dashboard',
+        'Admin': 'views.admin_dashboard',
+        'Lecturer': 'views.lecturer_dashboard',
+        'Finance': 'views.finance_dashboard'
+    }
     
-    return render_template('dashboard.html')
+    route = role_routes.get(current_user.role)
+    if route:
+        return redirect(url_for(route))
+    
+    return render_template('index.html')
 
 
 
