@@ -662,3 +662,48 @@ def lecturer_dashboard():
     return render_template('lecturer_dashboard.html', courses=courses,
 
                          course_count=course_count, student_count=student_count)
+
+#the new feature 
+#API section
+@views_bp.route('/api/v1/student/results')
+@login_required
+def api_get_results():
+    if current_user.role != 'Student':
+        return {"error": "Unauthorized"}, 403
+        
+    scores = Score.query.filter_by(student_id=current_user.student.id).all()
+    results = []
+    for s in scores:
+        results.append({
+            "course_code": s.course.code,
+            "total": (s.ca_score or 0) + (s.exam_score or 0),
+            "units": s.course.unit
+        })
+    return {"status": "success", "data": results}, 200
+
+
+#the clearance guard
+@views_bp.route('/dashboard')
+@login_required
+def dashboard():
+    # New check for the Finance Enhancement
+    if current_user.role == 'Student':
+        from .models import is_financially_cleared
+        if not is_financially_cleared(current_user.student.id):
+            flash("Please settle your outstanding balance to unlock all features.", "warning")
+            # You can either redirect them to a payment page or show a restricted dashboard
+    
+    return render_template('dashboard.html')@views_bp.route('/dashboard')
+
+
+    
+@login_required
+def dashboard():
+    # New check for the Finance Enhancement
+    if current_user.role == 'Student':
+        from .models import is_financially_cleared
+        if not is_financially_cleared(current_user.student.id):
+            flash("Please settle your outstanding balance to unlock all features.", "warning")
+            # You can either redirect them to a payment page or show a restricted dashboard
+    
+    return render_template('dashboard.html')

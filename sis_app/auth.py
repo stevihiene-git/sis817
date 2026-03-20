@@ -1,9 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from datetime import datetime
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
-from .models import User, Student
+from .models import User, Student, Course, CourseRegistration, Score, Payment, is_financially_cleared  # Add missing models
 import re
+import secrets  # If you're using secrets for password reset tokens
+
+
+
 
 # auth_bp = Blueprint('auth', __name__)
 
@@ -244,3 +249,26 @@ def get_dashboard_route():
     }
 
     return url_for(role_routes.get(current_user.role, 'views.index'))
+
+
+from flask import request
+
+class SecurityAudit(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Allow null for failed attempts
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    is_suspicious = db.Column(db.Boolean, default=False)
+    
+    
+def log_login_attempt(user, status):
+    """Log login attempts for security auditing"""
+    new_log = SecurityAudit(
+        user_id=user.id if user else None,
+        ip_address=request.remote_addr,
+        user_agent=request.user_agent.string if request.user_agent else None,
+        is_suspicious=(status == 'failed')  # Mark failed attempts as suspicious
+    )
+    db.session.add(new_log)
+    db.session.commit()

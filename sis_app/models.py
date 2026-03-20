@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
 from . import db
@@ -92,3 +93,20 @@ class Score(db.Model):
         elif total_score >= 40:
             return 1.0 * self.course.unit
         return 0.0
+
+#the new feature
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    reference = db.Column(db.String(100), unique=True)  # Payment Gateway Ref
+    status = db.Column(db.String(20), default='Pending')  # Pending, Success, Failed
+    date_paid = db.Column(db.DateTime, default=datetime.utcnow)  # Use utcnow for consistency
+
+
+# Logic to check clearance
+def is_financially_cleared(student_id):
+    student = Student.query.get(student_id)
+    if student is None:
+        return False  # or raise an exception, depending on the logic
+    return student.balance <= 0
