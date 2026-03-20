@@ -3,11 +3,15 @@
 {% block title %}Student Dashboard - SIS{% endblock %}
 
 {% block content %}
-<!-- Financial Hold Warning - MOVED INSIDE content block -->
+<!-- Financial Hold Warning -->
 {% if not financial_cleared %}
 <div class="alert alert-warning">
-    <strong>⚠️ Financial Hold!</strong> You have an outstanding balance of 
-    <strong>₦{{ "%.2f"|format(balance) }}</strong>. 
+    <strong>⚠️ Financial Hold!</strong> 
+    {% if balance is defined %}
+        You have an outstanding balance of <strong>₦{{ "%.2f"|format(balance) }}</strong>.
+    {% else %}
+        You have an outstanding balance.
+    {% endif %}
     <a href="{{ url_for('views.make_payment') }}" class="btn btn-warning btn-sm">
         Make Payment Now
     </a>
@@ -35,6 +39,14 @@
             {% endif %}
         </p>
     </div>
+    {% if balance is defined %}
+    <div class="stat-card">
+        <h3><i class="fas fa-money-bill-wave"></i> Current Balance</h3>
+        <p class="stat-number {% if balance > 0 %}text-danger{% else %}text-success{% endif %}">
+            ₦{{ "%.2f"|format(balance) }}
+        </p>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Registered Courses Section -->
@@ -79,6 +91,39 @@
     {% endif %}
 </div>
 
+<!-- Recent Payments Section -->
+{% if payments is defined and payments %}
+<div class="dashboard-section">
+    <h3><i class="fas fa-history"></i> Recent Payments</h3>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Reference</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr>
+                    <td>{{ payment.date_paid.strftime('%Y-%m-%d %H:%M') if payment.date_paid else 'N/A' }}</td>
+                    <td>{{ payment.reference }}</td>
+                    <td>₦{{ "%.2f"|format(payment.amount) }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if payment.status == 'Success' else 'warning' }}">
+                            {{ payment.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <!-- Quick Actions -->
 <div class="dashboard-actions">
     <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
@@ -89,6 +134,11 @@
         <a href="/student/results" class="btn btn-secondary">
             <i class="fas fa-chart-bar"></i> View Results
         </a>
+        {% if not financial_cleared and balance is defined and balance > 0 %}
+        <a href="{{ url_for('views.make_payment') }}" class="btn btn-warning">
+            <i class="fas fa-credit-card"></i> Make Payment
+        </a>
+        {% endif %}
         <a href="/auth/change_password" class="btn btn-info">
             <i class="fas fa-key"></i> Change Password
         </a>
@@ -118,11 +168,34 @@
     border-left: 4px solid #790100;
 }
 
+.stat-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
+    color: #666;
+}
+
 .stat-number {
     font-size: 2.5rem;
     font-weight: bold;
     color: #790100;
     margin: 10px 0 0 0;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.dashboard-header {
+    margin-bottom: 30px;
+}
+
+.dashboard-header h2 {
+    color: #333;
+    margin-bottom: 10px;
 }
 
 .dashboard-section {
@@ -133,6 +206,14 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
+.dashboard-section h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    border-bottom: 2px solid #790100;
+    padding-bottom: 10px;
+}
+
 .table {
     width: 100%;
     border-collapse: collapse;
@@ -141,12 +222,12 @@
 .table th {
     background-color: #790100;
     color: white;
-    padding: 15px;
+    padding: 12px;
     text-align: left;
 }
 
 .table td {
-    padding: 15px;
+    padding: 12px;
     border-bottom: 1px solid #eee;
 }
 
@@ -170,6 +251,33 @@
     background-color: #fff3cd;
     color: #856404;
     border: 1px solid #ffeaa7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.alert-warning strong {
+    margin-right: 10px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #212529;
 }
 
 .dashboard-actions {
@@ -177,6 +285,14 @@
     padding: 25px;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.dashboard-actions h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    border-bottom: 2px solid #790100;
+    padding-bottom: 10px;
 }
 
 .action-buttons {
@@ -194,6 +310,7 @@
     text-decoration: none;
     display: inline-block;
     font-size: 14px;
+    transition: all 0.3s ease;
 }
 
 .btn-primary {
@@ -203,6 +320,7 @@
 
 .btn-primary:hover {
     background-color: #5a0100;
+    transform: translateY(-2px);
 }
 
 .btn-secondary {
@@ -212,6 +330,7 @@
 
 .btn-secondary:hover {
     background-color: #545b62;
+    transform: translateY(-2px);
 }
 
 .btn-info {
@@ -221,6 +340,7 @@
 
 .btn-info:hover {
     background-color: #138496;
+    transform: translateY(-2px);
 }
 
 .btn-warning {
@@ -230,6 +350,7 @@
 
 .btn-warning:hover {
     background-color: #e0a800;
+    transform: translateY(-2px);
 }
 
 .btn-outline-danger {
@@ -241,6 +362,7 @@
 .btn-outline-danger:hover {
     background-color: #dc3545;
     color: white;
+    transform: translateY(-2px);
 }
 
 .mt-2 {
@@ -259,27 +381,37 @@
     .stats-grid {
         grid-template-columns: 1fr;
     }
-
+    
     .action-buttons {
         flex-direction: column;
     }
-
+    
     .btn {
         width: 100%;
         text-align: center;
         margin: 5px 0;
     }
-
+    
     .table-responsive {
         overflow-x: auto;
     }
-
+    
     .table {
         font-size: 0.9rem;
     }
-
+    
     .table th, .table td {
-        padding: 10px;
+        padding: 8px;
+    }
+    
+    .alert-warning {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .alert-warning .btn {
+        width: auto;
+        min-width: 150px;
     }
 }
 </style>
@@ -287,7 +419,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Student dashboard loaded successfully');
-
+    
     // Add confirmation for logout
     const logoutForms = document.querySelectorAll('form[action*="logout"]');
     logoutForms.forEach(form => {
@@ -296,6 +428,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
             }
         });
+    });
+    
+    // Auto-hide alerts after 5 seconds
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            alert.style.transition = 'opacity 0.5s ease';
+            alert.style.opacity = '0';
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 500);
+        }, 5000);
     });
 });
 </script>
