@@ -686,24 +686,88 @@ def api_get_results():
 @views_bp.route('/dashboard')
 @login_required
 def dashboard():
-    # New check for the Finance Enhancement
+    # Check financial clearance for students
     if current_user.role == 'Student':
         from .models import is_financially_cleared
-        if not is_financially_cleared(current_user.student.id):
-            flash("Please settle your outstanding balance to unlock all features.", "warning")
-            # You can either redirect them to a payment page or show a restricted dashboard
-    
-    return render_template('dashboard.html')@views_bp.route('/dashboard')
-
-
-    
-@login_required
-def dashboard():
-    # New check for the Finance Enhancement
-    if current_user.role == 'Student':
-        from .models import is_financially_cleared
-        if not is_financially_cleared(current_user.student.id):
-            flash("Please settle your outstanding balance to unlock all features.", "warning")
-            # You can either redirect them to a payment page or show a restricted dashboard
+        is_cleared = is_financially_cleared(current_user.student.id)
+        if not is_cleared:
+            flash("⚠️ Please settle your outstanding balance to access all features.", "warning")
+        
+        # Pass clearance status to template
+        return render_template('student_dashboard.html', 
+                             financial_cleared=is_cleared,
+                             balance=current_user.student.balance)
+    elif current_user.role == 'Admin':
+        return render_template('admin_dashboard.html')
+    elif current_user.role == 'Lecturer':
+        return render_template('lecturer_dashboard.html')
+    elif current_user.role == 'Finance':
+        return render_template('finance_dashboard.html')
     
     return render_template('dashboard.html')
+
+
+
+
+@views_bp.route('/make_payment', methods=['GET', 'POST'])
+@login_required
+def make_payment():
+    if current_user.role != 'Student':
+        flash("Only students can make payments.", "danger")
+        return redirect(url_for('views.dashboard'))
+    
+    from .models import Payment
+    from datetime import datetime
+    
+    if request.method == 'POST':
+        amount = float(request.form.get('amount', 0))
+        
+        if amount <= 0:
+            flash("Invalid amount.", "danger")
+            return redirect(url_for('views.make_payment'))
+        
+        # Create payment record
+        payment = Payment(
+            student_id=current_user.student.id,
+            amount=amount,
+            reference=f"PAY-{datetime.now().strftime('%Y%m%d%H%M%S')}-{current_user.id}",
+            status='Success',
+            date_paid=datetime.utcnow()
+        )
+        
+        # Update student balance
+        current_user.student.balance -= amount
+        
+        db.session.add(payment)
+        db.session.commit()
+        
+        flash(f"Payment of ₦{amount:,.2f} successful!", "success")
+        return redirect(url_for('views.dashboard'))
+    
+    return render_template('make_payment.html', 
+                         balance=current_user.student.balance)
+
+
+
+@views_bp.route('/finance_dashboard')
+@login_required
+def finance_dashboard():
+    if current_user.role != 'Finance' and current_user.role != 'Admin':
+        flash("Access denied.", "danger")
+        return redirect(url_for('views.dashboard'))
+    
+    from .models import Payment, Student
+    
+    # Get all payments
+    payments = Payment.query.order_by(Payment.date_paid.desc()).limit(50).all()
+    
+    # Get students with balances
+    students_with_balance = Student.query.filter(Student.balance > 0).all()
+    
+    # Calculate totals
+    total_revenue = db.session.query(db.func.sum(Payment.amount)).filter(Payment.status == 'Success').scalar() or 0
+    
+    return render_template('finance_dashboard.html',
+                         payments=payments,
+                         students_with_balance=students_with_balance,
+                         total_revenue=total_revenue)

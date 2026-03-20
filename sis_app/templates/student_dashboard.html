@@ -3,6 +3,17 @@
 {% block title %}Student Dashboard - SIS{% endblock %}
 
 {% block content %}
+<!-- Financial Hold Warning - MOVED INSIDE content block -->
+{% if not financial_cleared %}
+<div class="alert alert-warning">
+    <strong>⚠️ Financial Hold!</strong> You have an outstanding balance of 
+    <strong>₦{{ "%.2f"|format(balance) }}</strong>. 
+    <a href="{{ url_for('views.make_payment') }}" class="btn btn-warning btn-sm">
+        Make Payment Now
+    </a>
+</div>
+{% endif %}
+
 <div class="dashboard-header">
     <h2><i class="fas fa-user-graduate"></i> Student Dashboard</h2>
     <p>Welcome, {{ current_user.name }}. View your courses and academic progress.</p>
@@ -155,6 +166,12 @@
     border: 1px solid #bee5eb;
 }
 
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
 .dashboard-actions {
     background: white;
     padding: 25px;
@@ -204,6 +221,15 @@
 
 .btn-info:hover {
     background-color: #138496;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
 }
 
 .btn-outline-danger {

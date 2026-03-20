@@ -3,16 +3,12 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
-from .models import User, Student, Course, CourseRegistration, Score, Payment, is_financially_cleared  # Add missing models
+from .models import User, Student, Course, CourseRegistration, Score, Payment, is_financially_cleared, SecurityAudit
 import re
-import secrets  # If you're using secrets for password reset tokens
+import secrets
 
-
-
-
-# auth_bp = Blueprint('auth', __name__)
-
-auth_bp = Blueprint('auth', __name__, template_folder='public')
+# Blueprint configuration
+auth_bp = Blueprint('auth', __name__, template_folder='templates')  # Changed from 'public' to 'templates'
 
 
 # Password validation function
@@ -42,11 +38,42 @@ def validate_password(password):
 
     return True, "Password is valid"
 
+
 # Email validation function
 def validate_email(email):
     """Validate email format"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
+
+
+# ⚠️ IMPORTANT: Define log_login_attempt BEFORE it's used in the login function
+def log_login_attempt(user, status):
+    """Log login attempts for security auditing"""
+    new_log = SecurityAudit(
+        user_id=user.id if user else None,
+        ip_address=request.remote_addr,
+        user_agent=request.user_agent.string if request.user_agent else None,
+        is_suspicious=(status == 'failed')  # Mark failed attempts as suspicious
+    )
+    db.session.add(new_log)
+    db.session.commit()
+
+
+# Helper function to get the appropriate dashboard route
+def get_dashboard_route():
+    """Return the appropriate dashboard route based on user role"""
+    if not current_user.is_authenticated:
+        return url_for('views.index')
+
+    role_routes = {
+        'Admin': 'views.admin_dashboard',
+        'Student': 'views.student_dashboard',
+        'Lecturer': 'views.lecturer_dashboard',
+        'Finance': 'views.finance_dashboard'
+    }
+
+    return url_for(role_routes.get(current_user.role, 'views.index'))
+
 
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -78,13 +105,13 @@ def signup():
         if errors:
             for error in errors:
                 flash(error, 'error')
-            return render_template('signup.html',unique_id=unique_id,name=name,email=email)
+            return render_template('signup.html', unique_id=unique_id, name=name, email=email)
 
         # Check if user exists
         user = User.query.filter_by(unique_id=unique_id).first()
         if not user:
             flash('Unique ID not found. Please contact admin to be added.', 'error')
-            return render_template('signup.html',unique_id=unique_id,name=name,email=email)
+            return render_template('signup.html', unique_id=unique_id, name=name, email=email)
 
         if user.is_active:
             flash('Account already activated. Please log in.', 'error')
@@ -92,7 +119,7 @@ def signup():
 
         if User.query.filter_by(email=email).first():
             flash('Email already in use by another account.', 'error')
-            return render_template('signup.html',unique_id=unique_id,name=name,email=email)
+            return render_template('signup.html', unique_id=unique_id, name=name, email=email)
 
         # Update user
         try:
@@ -114,9 +141,10 @@ def signup():
         except Exception as e:
             db.session.rollback()
             flash('Error completing profile. Please try again.', 'error')
-            return render_template('signup.html', unique_id=unique_id,name=name,email=email)
+            return render_template('signup.html', unique_id=unique_id, name=name, email=email)
 
     return render_template('signup.html')
+
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -137,6 +165,9 @@ def login():
         # Security: Use constant-time comparison to prevent timing attacks
         if user and user.is_active:
             if check_password_hash(user.password_hash, password):
+                # 🔒 LOG SUCCESSFUL LOGIN ATTEMPT
+                log_login_attempt(user, 'success')
+                
                 login_user(user, remember=remember_me)
                 session.permanent = True
                 session.modified = True
@@ -148,14 +179,21 @@ def login():
 
                 flash(f'Welcome back, {user.name}!', 'success')
                 return redirect(get_dashboard_route())
+            else:
+                # 🔒 LOG FAILED LOGIN ATTEMPT (wrong password)
+                log_login_attempt(user, 'failed')
+        else:
+            # 🔒 LOG FAILED LOGIN ATTEMPT (user not found or inactive)
+            log_login_attempt(None, 'failed')
 
         # Generic error message to prevent user enumeration
-        flash('Invalid credentials or account not activated', 'error')
+        flash('Invalid credentials. Please check your Unique ID and password.', 'error')
         return render_template('login.html', unique_id=unique_id)
 
     return render_template('login.html')
 
-@auth_bp.route('/logout', methods=[ 'POST'])
+
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     user_name = current_user.name
@@ -163,6 +201,7 @@ def logout():
     session.clear()
     flash(f'Goodbye, {user_name}! You have been logged out successfully.', 'success')
     return redirect(url_for('views.index'))
+
 
 @auth_bp.route('/change_password', methods=['GET', 'POST'])
 @login_required
@@ -210,6 +249,7 @@ def change_password():
 
     return render_template('change_password.html')
 
+
 @auth_bp.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if current_user.is_authenticated:
@@ -234,41 +274,3 @@ def forgot_password():
         return redirect(url_for('auth.login'))
 
     return render_template('forgot_password.html')
-
-# Helper function to get the appropriate dashboard route
-def get_dashboard_route():
-    """Return the appropriate dashboard route based on user role"""
-    if not current_user.is_authenticated:
-        return url_for('views.index')
-
-    role_routes = {
-        'Admin': 'views.admin_dashboard',
-        'Student': 'views.student_dashboard',
-        'Lecturer': 'views.lecturer_dashboard',
-        'Finance': 'views.finance_dashboard'
-    }
-
-    return url_for(role_routes.get(current_user.role, 'views.index'))
-
-
-from flask import request
-
-class SecurityAudit(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Allow null for failed attempts
-    ip_address = db.Column(db.String(45))
-    user_agent = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    is_suspicious = db.Column(db.Boolean, default=False)
-    
-    
-def log_login_attempt(user, status):
-    """Log login attempts for security auditing"""
-    new_log = SecurityAudit(
-        user_id=user.id if user else None,
-        ip_address=request.remote_addr,
-        user_agent=request.user_agent.string if request.user_agent else None,
-        is_suspicious=(status == 'failed')  # Mark failed attempts as suspicious
-    )
-    db.session.add(new_log)
-    db.session.commit()
