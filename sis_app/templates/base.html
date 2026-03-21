@@ -176,5 +176,15 @@
     </div>
 </nav>
     {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer style="background: #2c3e50; color: white; text-align: center; padding: 20px; margin-top: 50px;">
+        <p>&copy; {{ now.year if now else 2024 }} Student Information System. All rights reserved.</p>
+        <p style="margin-top: 10px;">
+            <a href="/" style="color: #790100; text-decoration: none;">Home</a> | 
+            <a href="/auth/login" style="color: #790100; text-decoration: none;">Login</a> |
+            <a href="#" style="color: #790100; text-decoration: none;">Privacy Policy</a>
+        </p>
+    </footer>
 </body>
 </html>
