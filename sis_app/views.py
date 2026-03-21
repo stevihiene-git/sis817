@@ -500,6 +500,8 @@ def student_register_course():
                          registered_courses=registered_course_ids)
 
 
+
+
 @views_bp.route('/student/results')
 @login_required
 def student_results():
@@ -583,6 +585,12 @@ def student_results():
 
         # Determine final grade
         final_grade = "DISTINCTION" if cgpa >= 3.0 else "PASS"
+        
+        # Calculate total courses count
+        total_courses = 0
+        for session, semesters in results_by_session_semester.items():
+            for semester, scores in semesters.items():
+                total_courses += len(scores)
 
         return render_template(
             'student_results.html',
@@ -590,11 +598,14 @@ def student_results():
             gpa_by_session_semester=gpa_by_session_semester,
             cgpa=cgpa,
             final_grade=final_grade,
-            student=student
+            student=student,
+            total_courses=total_courses  # Add this line
         )
 
     except Exception as e:
         logging.error(f"Error loading student results: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash('Error loading results. Please try again.', 'error')
         return redirect(url_for('views.student_dashboard'))
 
