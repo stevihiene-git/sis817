@@ -64,6 +64,7 @@ class CourseRegistration(db.Model):
         db.UniqueConstraint('student_id', 'course_id', name='unique_student_course_registration'),
     )
 
+
 class Score(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
@@ -78,10 +79,12 @@ class Score(db.Model):
     )
     
     def calculate_grade_point(self):
+        """Calculate grade points based on total score"""
         if not self.course:
             return 0.0
             
         total_score = (self.ca_score or 0) + (self.exam_score or 0)
+        
         if total_score >= 70:
             return 5.0 * self.course.unit
         elif total_score >= 60:
@@ -93,6 +96,24 @@ class Score(db.Model):
         elif total_score >= 40:
             return 1.0 * self.course.unit
         return 0.0
+    
+    def get_grade(self):
+        """Get letter grade based on total score"""
+        total_score = (self.ca_score or 0) + (self.exam_score or 0)
+        
+        if total_score >= 70:
+            return 'A'
+        elif total_score >= 60:
+            return 'B'
+        elif total_score >= 50:
+            return 'C'
+        elif total_score >= 45:
+            return 'D'
+        elif total_score >= 40:
+            return 'E'
+        return 'F'
+
+
 
 #the new feature
 class Payment(db.Model):

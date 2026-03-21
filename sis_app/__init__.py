@@ -1,132 +1,88 @@
-from flask import Flask
-from flask_wtf.csrf import CSRFProtect
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
-from flask_migrate import Migrate  # ADD THIS IMPORT
-from werkzeug.security import generate_password_hash
 import os
-import secrets
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 import logging
-from datetime import timedelta
 
-# Create the core application instance and extensions
-app = Flask(__name__, template_folder='templates')
-# app.config["SQLALCHEMY_DATABASE_URI"]= "postgresql://neondb_owner:npg_v7RP1oKYmFwM@ep-bold-mud-adroxeim-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-app.config["SQLALCHEMY_DATABASE_URI"]= "postgresql://neondb_owner:npg_0pkAG6wWIQej@ep-bold-mud-adroxeim-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Initialize extensions
 db = SQLAlchemy()
+migrate = Migrate()
 login_manager = LoginManager()
 csrf = CSRFProtect()
-migrate = Migrate()  # # Initialize Migrate
 
-# Configuration
-app.config['SECRET_KEY'] =  "2d2c5c6476929240e999d4487136ecf06f223dc9e7c381272bf7ae4eaf0c13ab" #  os.environ.get('SECRET_KEY') or secrets.token_hex(32)
-# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///sis.db'
-app.config["SQLALCHEMY_DATABASE_URI"]= "postgresql://neondb_owner:npg_0pkAG6wWIQej@ep-bold-mud-adroxeim-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
-app.config['SESSION_PROTECTION'] = 'strong'
-app.config['WTF_CSRF_ENABLED'] = True
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Initialize app extensions
-db.init_app(app)
-login_manager.login_view = 'auth.login'
-login_manager.login_message = 'Please log in to access this page.'
-login_manager.login_message_category = 'info'
-login_manager.session_protection = 'strong'
-login_manager.init_app(app)
-csrf.init_app(app)
-migrate.init_app(app, db)  # ADD THIS LINE - CRUCIAL!
+def create_app():
+    app = Flask(__name__)
+    
+    # Basic configuration
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_SECRET_KEY'] = os.environ.get('WTF_CSRF_SECRET_KEY', 'csrf-secret-key')
+    
+    # Database configuration - Use environment variable
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if not database_url:
+        # Default to SQLite for local development
+        database_url = 'sqlite:///sis.db'
+        logger.info("Using SQLite database for development")
+    
+    # Handle Heroku/Vercel PostgreSQL URLs (they start with postgres://)
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    logger.info(f"Database URI configured: {database_url.split('@')[0] if '@' in database_url else database_url}")
+    
+    # Initialize extensions with app
+    db.init_app(app)
+    migrate.init_app(app, db)
+    login_manager.init_app(app)
+    csrf.init_app(app)
+    
+    # Configure login
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
+    
+    return app
 
-# Import models to define them before creating tables
-from . import models
+# Create app instance
+app = create_app()
 
-# CRITICAL: Add the user_loader function
-@login_manager.user_loader
-def load_user(user_id):
-    """This function is required by Flask-Login to load a user from the user ID"""
-    try:
-        return db.session.get(models.User, int(user_id))
-    except Exception as e:
-        logging.error(f"Error loading user {user_id}: {str(e)}")
-        return None
-
-# Import and regi
-# ster blueprints
+# Import models and routes after app creation to avoid circular imports
+from .models import User, Student, Course, CourseRegistration, Score, Payment, SecurityAudit
 from .auth import auth_bp
 from .views import views_bp
 
+# Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/auth')
-app.register_blueprint(views_bp, url_prefix='/')
+app.register_blueprint(views_bp)
 
-# Error handlers
-@app.errorhandler(404)
-def not_found_error(error):
-    return "Page not found", 404
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
-@app.errorhandler(500)
-def internal_error(error):
-    db.session.rollback()
-    return "Internal server error", 500
-
-# Context processors
-@app.context_processor
-def inject_user():
-    """Make current_user available to all templates"""
-    from flask_login import current_user
-    return dict(current_user=current_user)
-
-@app.context_processor
-def inject_roles():
-    """Make roles available to all templates"""
-    return dict(roles=['Admin', 'Student', 'Lecturer', 'Finance'])
-
-# --- Database Initialization ---
 def init_db():
-    """Initialize the database with required data"""
+    """Initialize database tables"""
     with app.app_context():
         try:
-            logging.info("Creating database tables")
             db.create_all()
-            logging.info("Database tables created")
-
-            # Create Super Admin if not exists
-            if not models.User.query.filter_by(unique_id='SUPERADMIN').first():
-                super_admin = models.User(
-                    email='superadmin@sis.edu',
-                    password_hash=generate_password_hash('Admin123!'),
-                    name='Super Administrator',
-                    role='Admin',
-                    unique_id='SUPERADMIN',
-                    is_active=True,
-                    must_change_password=False,
-                    faculty='Administration',
-                    department='System Administration'
-                )
-                db.session.add(super_admin)
-                db.session.commit()
-                logging.info("Super admin created")
-
+            logger.info("Database tables created successfully")
         except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error initializing database: {str(e)}")
-            raise
+            logger.error(f"Error initializing database: {e}")
 
-
-@app.route('/debug/secret-key')
-def debug_secret_key():
-    import os
-    current_key = os.environ.get('SECRET_KEY') or "Not set in environment"
-    generated_key = "Would generate: " + secrets.token_hex(32) if not os.environ.get('SECRET_KEY') else ""
-    return f"""
-    <h1>Secret Key Debug</h1>
-    <p>Environment SECRET_KEY: <strong>{current_key}</strong></p>
-    <p>{generated_key}</p>
-    <p>App config SECRET_KEY: <strong>{app.config['SECRET_KEY']}</strong></p>
-    """
-
-# Initialize database when app starts
+# Initialize database
 init_db()
+
+# Make csrf_token available in all templates
+@app.context_processor
+def inject_csrf_token():
+    from flask_wtf.csrf import generate_csrf
+    return dict(csrf_token=generate_csrf)

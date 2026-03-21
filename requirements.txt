@@ -8,3 +8,4 @@ Werkzeug
 python-dotenv
 alembic
 gunicorn
+flask-wtf==1.2.1
