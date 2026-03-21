@@ -1,3 +1,5 @@
+# Create the complete student_results.html file
+cat > sis_app/templates/student_results.html << 'EOF'
 {% extends "base.html" %}
 
 {% block title %}Student Results - SIS{% endblock %}
@@ -98,7 +100,7 @@
                                 </td>
                                 <td>
                                     {% set total = (score.ca_score or 0) + (score.exam_score or 0) %}
-                                    <span class="badge badge-{{ 'grade-a' if total >= 70 else 'grade-b' if total >= 60 else 'grade-c' if total >= 50 else 'grade-d' if total >= 45 else 'grade-e' if total >= 40 else 'grade-f' }}">
+                                    <span class="badge grade-{{ 'a' if total >= 70 else 'b' if total >= 60 else 'c' if total >= 50 else 'd' if total >= 45 else 'e' if total >= 40 else 'f' }}">
                                         {% if total >= 70 %}A
                                         {% elif total >= 60 %}B
                                         {% elif total >= 50 %}C
@@ -153,50 +155,6 @@
     {% endif %}
 </div>
 
-<!-- Legend and Explanation -->
-<div class="dashboard-section">
-    <h3><i class="fas fa-info-circle"></i> Grading System</h3>
-    <div class="grading-legend">
-        <div class="legend-item">
-            <span class="badge grade-a">A</span>
-            <span>70 - 100%</span>
-            <span class="grade-point-text">5.0 Grade Points</span>
-        </div>
-        <div class="legend-item">
-            <span class="badge grade-b">B</span>
-            <span>60 - 69%</span>
-            <span class="grade-point-text">4.0 Grade Points</span>
-        </div>
-        <div class="legend-item">
-            <span class="badge grade-c">C</span>
-            <span>50 - 59%</span>
-            <span class="grade-point-text">3.0 Grade Points</span>
-        </div>
-        <div class="legend-item">
-            <span class="badge grade-d">D</span>
-            <span>45 - 49%</span>
-            <span class="grade-point-text">2.0 Grade Points</span>
-        </div>
-        <div class="legend-item">
-            <span class="badge grade-e">E</span>
-            <span>40 - 44%</span>
-            <span class="grade-point-text">1.0 Grade Points</span>
-        </div>
-        <div class="legend-item">
-            <span class="badge grade-f">F</span>
-            <span>Below 40%</span>
-            <span class="grade-point-text">0.0 Grade Points</span>
-        </div>
-    </div>
-    <div class="academic-standing">
-        <h4>Academic Standing Classification:</h4>
-        <ul>
-            <li><strong>DISTINCTION:</strong> CGPA of 3.0 and above</li>
-            <li><strong>PASS:</strong> CGPA below 3.0</li>
-        </ul>
-    </div>
-</div>
-
 <style>
 .stats-grid {
     display: grid;
@@ -230,6 +188,10 @@
     font-size: 1rem;
     color: #666;
     font-weight: 500;
+}
+
+.dashboard-header {
+    margin-bottom: 30px;
 }
 
 .dashboard-section {
@@ -421,44 +383,6 @@
     color: #666;
 }
 
-.grading-legend {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.legend-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 5px;
-}
-
-.grade-point-text {
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.academic-standing {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 5px;
-}
-
-.academic-standing h4 {
-    margin-top: 0;
-    color: #790100;
-}
-
-.academic-standing ul {
-    margin: 10px 0 0 0;
-    padding-left: 20px;
-}
-
 .btn {
     padding: 8px 15px;
     border: none;
@@ -545,10 +469,6 @@
     
     .table th, .table td {
         padding: 8px;
-    }
-    
-    .grading-legend {
-        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -653,3 +573,4 @@ function clearFilters() {
 }
 </script>
 {% endblock %}
+EOF
