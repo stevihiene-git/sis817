@@ -199,14 +199,19 @@ def admin_dashboard():
     users = User.query.order_by(User.role, User.name).all()
     courses = Course.query.order_by(Course.code).all()
 
-    user_count = len(users)
+    # Calculate counts
+    total_users = len(users)
     student_count = len([u for u in users if u.role == 'Student'])
     lecturer_count = len([u for u in users if u.role == 'Lecturer'])
-    course_count = len(courses)
+    total_courses = len(courses)
 
-    return render_template('admin_dashboard.html', users=users, courses=courses,
-                         user_count=user_count, student_count=student_count,
-                         lecturer_count=lecturer_count, course_count=course_count)
+    return render_template('admin_dashboard.html', 
+                         users=users, 
+                         courses=courses,
+                         total_users=total_users,
+                         student_count=student_count,
+                         lecturer_count=lecturer_count,
+                         total_courses=total_courses)
 
 @views_bp.route('/admin/add_user', methods=['GET', 'POST'])
 @login_required
