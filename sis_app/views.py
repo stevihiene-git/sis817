@@ -418,6 +418,8 @@ def admin_delete_course(course_id):
 
 
 # --- Student Routes ---
+
+
 @views_bp.route('/student/dashboard')
 @login_required
 def student_dashboard():
@@ -438,12 +440,45 @@ def student_dashboard():
     # Get registered courses
     registered_courses = [reg.course for reg in student.registrations]
     
+    # Debug: Print balance to console
+    print(f"Student {current_user.name} balance: {student.balance}")
+    
     return render_template('student_dashboard.html',
                          student=student,
                          registered_courses=registered_courses,
                          financial_cleared=is_cleared,
-                         balance=student.balance,
+                         balance=student.balance,  # Always pass balance
+                         payments=payments)@views_bp.route('/student/dashboard')
+@login_required
+def student_dashboard():
+    if current_user.role != 'Student':
+        flash("Access denied.", "danger")
+        return redirect(url_for('views.dashboard'))
+    
+    student = current_user.student
+    
+    # Check financial clearance
+    is_cleared = is_financially_cleared(student.id)
+    
+    # Get recent payments
+    payments = Payment.query.filter_by(
+        student_id=student.id
+    ).order_by(Payment.date_paid.desc()).limit(10).all()
+    
+    # Get registered courses
+    registered_courses = [reg.course for reg in student.registrations]
+    
+    # Debug: Print balance to console
+    print(f"Student {current_user.name} balance: {student.balance}")
+    
+    return render_template('student_dashboard.html',
+                         student=student,
+                         registered_courses=registered_courses,
+                         financial_cleared=is_cleared,
+                         balance=student.balance,  # Always pass balance
                          payments=payments)
+
+
 
 
 @views_bp.route('/student/register_course', methods=['GET', 'POST'])

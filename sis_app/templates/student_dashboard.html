@@ -4,14 +4,11 @@
 
 {% block content %}
 <!-- Financial Hold Warning -->
-{% if not financial_cleared %}
+<!-- Financial Hold Warning - Make it always visible for students with balance > 0 -->
+{% if not financial_cleared and balance is defined and balance > 0 %}
 <div class="alert alert-warning">
     <strong>⚠️ Financial Hold!</strong> 
-    {% if balance is defined %}
-        You have an outstanding balance of <strong>₦{{ "%.2f"|format(balance) }}</strong>.
-    {% else %}
-        You have an outstanding balance.
-    {% endif %}
+    You have an outstanding balance of <strong>₦{{ "%.2f"|format(balance) }}</strong>.
     <a href="{{ url_for('views.make_payment') }}" class="btn btn-warning btn-sm">
         Make Payment Now
     </a>
@@ -171,6 +168,7 @@
 {% endif %}
 
 <!-- Quick Actions -->
+<!-- Quick Actions -->
 <div class="dashboard-actions">
     <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
     <div class="action-buttons">
@@ -180,11 +178,9 @@
         <a href="/student/results" class="btn btn-secondary">
             <i class="fas fa-chart-bar"></i> View Results
         </a>
-        {% if not financial_cleared and balance is defined and balance > 0 %}
         <a href="{{ url_for('views.make_payment') }}" class="btn btn-warning">
             <i class="fas fa-credit-card"></i> Make Payment
         </a>
-        {% endif %}
         <a href="/auth/change_password" class="btn btn-info">
             <i class="fas fa-key"></i> Change Password
         </a>
@@ -196,6 +192,7 @@
         </form>
     </div>
 </div>
+
 
 <style>
 .stats-grid {
