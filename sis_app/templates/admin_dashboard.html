@@ -35,7 +35,7 @@
         <div class="header-actions">
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="userSearch" placeholder="Search users..." onkeyup="filterTable('userTable', 'userSearch')">
+                <input type="text" id="userSearch" placeholder="Search by ID, Name, Email, Role..." onkeyup="filterUsers()">
             </div>
             <a href="/admin/add_user" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add User
@@ -43,24 +43,23 @@
         </div>
     </div>
 
-    <!-- User Table with Pagination -->
     <div class="table-responsive">
         <table class="table" id="userTable">
             <thead>
                 <tr>
-                    <th onclick="sortTable('userTable', 0)">Unique ID <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable('userTable', 1)">Name <i class="fas fa-sort"></i></th>
-                    <th>Email</th>
-                    <th onclick="sortTable('userTable', 3)">Role <i class="fas fa-sort"></i></th>
+                    <th onclick="sortUsers(0)">Unique ID <i class="fas fa-sort"></i></th>
+                    <th onclick="sortUsers(1)">Name <i class="fas fa-sort"></i></th>
+                    <th onclick="sortUsers(2)">Email <i class="fas fa-sort"></i></th>
+                    <th onclick="sortUsers(3)">Role <i class="fas fa-sort"></i></th>
                     <th>Faculty</th>
                     <th>Department</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="userTableBody">
                 {% for user in users %}
-                <tr>
+                <tr data-searchable="{{ user.unique_id|lower }} {{ user.name|lower }} {{ (user.email or '')|lower }} {{ user.role|lower }}">
                     <td>{{ user.unique_id }}</td>
                     <td>{{ user.name }}</td>
                     <td>{{ user.email or 'N/A' }}</td>
@@ -91,12 +90,11 @@
         </table>
     </div>
     
-    <!-- User Pagination Controls -->
     <div class="pagination-controls">
-        <button onclick="changePage('userTable', -1)" class="btn btn-sm btn-secondary">Previous</button>
-        <span id="userTablePageInfo">Page 1</span>
-        <button onclick="changePage('userTable', 1)" class="btn btn-sm btn-secondary">Next</button>
-        <select id="userTableRows" onchange="changeRowsPerPage('userTable', this.value)">
+        <button onclick="changeUserPage(-1)" class="btn btn-sm btn-secondary">Previous</button>
+        <span id="userPageInfo">Page 1</span>
+        <button onclick="changeUserPage(1)" class="btn btn-sm btn-secondary">Next</button>
+        <select id="userRowsPerPage" onchange="setUserRowsPerPage(this.value)">
             <option value="10">10 per page</option>
             <option value="25">25 per page</option>
             <option value="50">50 per page</option>
@@ -112,7 +110,7 @@
         <div class="header-actions">
             <div class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" id="courseSearch" placeholder="Search courses..." onkeyup="filterTable('courseTable', 'courseSearch')">
+                <input type="text" id="courseSearch" placeholder="Search by Code, Title, Lecturer..." onkeyup="filterCourses()">
             </div>
             <a href="/admin/add_course" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add Course
@@ -120,23 +118,22 @@
         </div>
     </div>
 
-    <!-- Course Table with Pagination -->
     <div class="table-responsive">
         <table class="table" id="courseTable">
             <thead>
                 <tr>
-                    <th onclick="sortTable('courseTable', 0)">Code <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable('courseTable', 1)">Title <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable('courseTable', 2)">Units <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable('courseTable', 3)">Session <i class="fas fa-sort"></i></th>
-                    <th onclick="sortTable('courseTable', 4)">Semester <i class="fas fa-sort"></i></th>
-                    <th>Lecturer</th>
+                    <th onclick="sortCourses(0)">Code <i class="fas fa-sort"></i></th>
+                    <th onclick="sortCourses(1)">Title <i class="fas fa-sort"></i></th>
+                    <th onclick="sortCourses(2)">Units <i class="fas fa-sort"></i></th>
+                    <th onclick="sortCourses(3)">Session <i class="fas fa-sort"></i></th>
+                    <th onclick="sortCourses(4)">Semester <i class="fas fa-sort"></i></th>
+                    <th onclick="sortCourses(5)">Lecturer <i class="fas fa-sort"></i></th>
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="courseTableBody">
                 {% for course in courses %}
-                <tr>
+                <tr data-searchable="{{ course.code|lower }} {{ course.title|lower }} {{ (course.lecturer.name if course.lecturer else '')|lower }}">
                     <td><strong>{{ course.code }}</strong></td>
                     <td>{{ course.title }}</td>
                     <td>{{ course.unit }}</td>
@@ -160,12 +157,11 @@
         </table>
     </div>
     
-    <!-- Course Pagination Controls -->
     <div class="pagination-controls">
-        <button onclick="changePage('courseTable', -1)" class="btn btn-sm btn-secondary">Previous</button>
-        <span id="courseTablePageInfo">Page 1</span>
-        <button onclick="changePage('courseTable', 1)" class="btn btn-sm btn-secondary">Next</button>
-        <select id="courseTableRows" onchange="changeRowsPerPage('courseTable', this.value)">
+        <button onclick="changeCoursePage(-1)" class="btn btn-sm btn-secondary">Previous</button>
+        <span id="coursePageInfo">Page 1</span>
+        <button onclick="changeCoursePage(1)" class="btn btn-sm btn-secondary">Next</button>
+        <select id="courseRowsPerPage" onchange="setCourseRowsPerPage(this.value)">
             <option value="10">10 per page</option>
             <option value="25">25 per page</option>
             <option value="50">50 per page</option>
@@ -236,23 +232,37 @@
 
 .search-box i {
     position: absolute;
-    left: 10px;
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
     color: #999;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 1;
 }
 
 .search-box input {
-    padding: 8px 10px 8px 35px;
+    padding: 10px 12px 10px 38px;
     border: 1px solid #ddd;
-    border-radius: 5px;
+    border-radius: 6px;
     font-size: 14px;
-    width: 250px;
+    width: 300px;
+    transition: all 0.3s ease;
 }
 
 .search-box input:focus {
     outline: none;
     border-color: #790100;
+    box-shadow: 0 0 0 3px rgba(121, 1, 0, 0.1);
+}
+
+.search-box input::placeholder {
+    color: #aaa;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    margin-bottom: 20px;
 }
 
 .table {
@@ -378,11 +388,6 @@
     color: white;
 }
 
-.table-responsive {
-    overflow-x: auto;
-    margin-bottom: 20px;
-}
-
 .pagination-controls {
     display: flex;
     justify-content: center;
@@ -436,135 +441,185 @@
 </style>
 
 <script>
-// Global variables to store current page and rows per page
-let currentPage = {};
-let rowsPerPage = {};
+// User management variables
+let allUserRows = [];
+let filteredUserRows = [];
+let currentUserPage = 1;
+let userRowsPerPage = 10;
+let userSortColumn = null;
+let userSortDirection = 'asc';
 
-function initializePagination() {
-    // Initialize for user table
-    currentPage['userTable'] = 1;
-    rowsPerPage['userTable'] = 10;
-    updateTableDisplay('userTable');
-    
-    // Initialize for course table
-    currentPage['courseTable'] = 1;
-    rowsPerPage['courseTable'] = 10;
-    updateTableDisplay('courseTable');
-}
-
-function updateTableDisplay(tableId) {
-    const table = document.getElementById(tableId);
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-    const totalRows = rows.length;
-    const start = (currentPage[tableId] - 1) * rowsPerPage[tableId];
-    const end = start + rowsPerPage[tableId];
-    
-    // Hide all rows first
-    for (let i = 0; i < rows.length; i++) {
-        rows[i].style.display = 'none';
-    }
-    
-    // Show rows for current page
-    for (let i = start; i < end && i < totalRows; i++) {
-        rows[i].style.display = '';
-    }
-    
-    // Update page info
-    const totalPages = Math.ceil(totalRows / rowsPerPage[tableId]);
-    document.getElementById(`${tableId}PageInfo`).innerHTML = `Page ${currentPage[tableId]} of ${totalPages || 1}`;
-}
-
-function changePage(tableId, delta) {
-    const table = document.getElementById(tableId);
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-    const totalPages = Math.ceil(rows.length / rowsPerPage[tableId]);
-    
-    let newPage = currentPage[tableId] + delta;
-    if (newPage < 1) newPage = 1;
-    if (newPage > totalPages) newPage = totalPages;
-    
-    currentPage[tableId] = newPage;
-    updateTableDisplay(tableId);
-}
-
-function changeRowsPerPage(tableId, value) {
-    rowsPerPage[tableId] = parseInt(value);
-    currentPage[tableId] = 1;
-    updateTableDisplay(tableId);
-}
-
-function filterTable(tableId, searchInputId) {
-    const input = document.getElementById(searchInputId);
-    const filter = input.value.toUpperCase();
-    const table = document.getElementById(tableId);
-    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-    
-    // Filter rows
-    for (let i = 0; i < rows.length; i++) {
-        const cells = rows[i].getElementsByTagName('td');
-        let found = false;
-        for (let j = 0; j < cells.length - 1; j++) { // Exclude actions column
-            const textValue = cells[j].textContent || cells[j].innerText;
-            if (textValue.toUpperCase().indexOf(filter) > -1) {
-                found = true;
-                break;
-            }
-        }
-        rows[i].style.display = found ? '' : 'none';
-    }
-    
-    // Reset pagination
-    currentPage[tableId] = 1;
-    updateTableDisplay(tableId);
-}
-
-function sortTable(tableId, column) {
-    const table = document.getElementById(tableId);
-    const tbody = table.getElementsByTagName('tbody')[0];
-    const rows = Array.from(tbody.getElementsByTagName('tr'));
-    let switching = true;
-    let dir = "asc";
-    
-    while (switching) {
-        switching = false;
-        for (let i = 0; i < rows.length - 1; i++) {
-            let shouldSwitch = false;
-            const x = rows[i].getElementsByTagName('td')[column];
-            const y = rows[i + 1].getElementsByTagName('td')[column];
-            
-            if (dir === "asc") {
-                if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                    shouldSwitch = true;
-                    break;
-                }
-            } else if (dir === "desc") {
-                if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                    shouldSwitch = true;
-                    break;
-                }
-            }
-        }
-        
-        if (shouldSwitch) {
-            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-            switching = true;
-        } else {
-            if (dir === "asc") {
-                dir = "desc";
-                switching = true;
-            }
-        }
-    }
-    
-    // Reset pagination after sort
-    currentPage[tableId] = 1;
-    updateTableDisplay(tableId);
-}
+// Course management variables
+let allCourseRows = [];
+let filteredCourseRows = [];
+let currentCoursePage = 1;
+let courseRowsPerPage = 10;
+let courseSortColumn = null;
+let courseSortDirection = 'asc';
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    initializePagination();
-    console.log('Admin dashboard with pagination loaded');
+    // Store all user rows
+    const userTableBody = document.getElementById('userTableBody');
+    allUserRows = Array.from(userTableBody.getElementsByTagName('tr'));
+    filteredUserRows = [...allUserRows];
+    
+    // Store all course rows
+    const courseTableBody = document.getElementById('courseTableBody');
+    allCourseRows = Array.from(courseTableBody.getElementsByTagName('tr'));
+    filteredCourseRows = [...allCourseRows];
+    
+    // Set rows per page from selects
+    userRowsPerPage = parseInt(document.getElementById('userRowsPerPage').value);
+    courseRowsPerPage = parseInt(document.getElementById('courseRowsPerPage').value);
+    
+    // Initial display
+    updateUserDisplay();
+    updateCourseDisplay();
+    
+    console.log('Admin dashboard initialized with', allUserRows.length, 'users and', allCourseRows.length, 'courses');
 });
+
+// User Management Functions
+function filterUsers() {
+    const searchTerm = document.getElementById('userSearch').value.toLowerCase();
+    
+    if (searchTerm === '') {
+        filteredUserRows = [...allUserRows];
+    } else {
+        filteredUserRows = allUserRows.filter(row => {
+            const searchable = row.getAttribute('data-searchable') || '';
+            return searchable.includes(searchTerm);
+        });
+    }
+    
+    currentUserPage = 1;
+    updateUserDisplay();
+}
+
+function sortUsers(columnIndex) {
+    if (userSortColumn === columnIndex) {
+        userSortDirection = userSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        userSortColumn = columnIndex;
+        userSortDirection = 'asc';
+    }
+    
+    filteredUserRows.sort((a, b) => {
+        const aValue = a.getElementsByTagName('td')[columnIndex].textContent.toLowerCase();
+        const bValue = b.getElementsByTagName('td')[columnIndex].textContent.toLowerCase();
+        
+        if (aValue < bValue) return userSortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return userSortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    currentUserPage = 1;
+    updateUserDisplay();
+}
+
+function updateUserDisplay() {
+    const start = (currentUserPage - 1) * userRowsPerPage;
+    const end = start + userRowsPerPage;
+    const pageRows = filteredUserRows.slice(start, end);
+    const totalPages = Math.ceil(filteredUserRows.length / userRowsPerPage);
+    
+    // Update table body
+    const userTableBody = document.getElementById('userTableBody');
+    userTableBody.innerHTML = '';
+    pageRows.forEach(row => {
+        userTableBody.appendChild(row.cloneNode(true));
+    });
+    
+    // Update page info
+    document.getElementById('userPageInfo').innerHTML = `Page ${currentUserPage} of ${totalPages || 1}`;
+}
+
+function changeUserPage(delta) {
+    const totalPages = Math.ceil(filteredUserRows.length / userRowsPerPage);
+    const newPage = currentUserPage + delta;
+    
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentUserPage = newPage;
+        updateUserDisplay();
+    }
+}
+
+function setUserRowsPerPage(value) {
+    userRowsPerPage = parseInt(value);
+    currentUserPage = 1;
+    updateUserDisplay();
+}
+
+// Course Management Functions
+function filterCourses() {
+    const searchTerm = document.getElementById('courseSearch').value.toLowerCase();
+    
+    if (searchTerm === '') {
+        filteredCourseRows = [...allCourseRows];
+    } else {
+        filteredCourseRows = allCourseRows.filter(row => {
+            const searchable = row.getAttribute('data-searchable') || '';
+            return searchable.includes(searchTerm);
+        });
+    }
+    
+    currentCoursePage = 1;
+    updateCourseDisplay();
+}
+
+function sortCourses(columnIndex) {
+    if (courseSortColumn === columnIndex) {
+        courseSortDirection = courseSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        courseSortColumn = columnIndex;
+        courseSortDirection = 'asc';
+    }
+    
+    filteredCourseRows.sort((a, b) => {
+        const aValue = a.getElementsByTagName('td')[columnIndex].textContent.toLowerCase();
+        const bValue = b.getElementsByTagName('td')[columnIndex].textContent.toLowerCase();
+        
+        if (aValue < bValue) return courseSortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return courseSortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    currentCoursePage = 1;
+    updateCourseDisplay();
+}
+
+function updateCourseDisplay() {
+    const start = (currentCoursePage - 1) * courseRowsPerPage;
+    const end = start + courseRowsPerPage;
+    const pageRows = filteredCourseRows.slice(start, end);
+    const totalPages = Math.ceil(filteredCourseRows.length / courseRowsPerPage);
+    
+    // Update table body
+    const courseTableBody = document.getElementById('courseTableBody');
+    courseTableBody.innerHTML = '';
+    pageRows.forEach(row => {
+        courseTableBody.appendChild(row.cloneNode(true));
+    });
+    
+    // Update page info
+    document.getElementById('coursePageInfo').innerHTML = `Page ${currentCoursePage} of ${totalPages || 1}`;
+}
+
+function changeCoursePage(delta) {
+    const totalPages = Math.ceil(filteredCourseRows.length / courseRowsPerPage);
+    const newPage = currentCoursePage + delta;
+    
+    if (newPage >= 1 && newPage <= totalPages) {
+        currentCoursePage = newPage;
+        updateCourseDisplay();
+    }
+}
+
+function setCourseRowsPerPage(value) {
+    courseRowsPerPage = parseInt(value);
+    currentCoursePage = 1;
+    updateCourseDisplay();
+}
 </script>
 {% endblock %}
