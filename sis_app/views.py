@@ -23,17 +23,20 @@ def get_redirect_url():
     }
     return url_for(role_routes.get(current_user.role, 'views.index'))
 
+
 def validate_admin_access():
     if current_user.role != 'Admin':
         flash('Access restricted to administrators', 'error')
         return False
     return True
 
+
 def validate_student_access():
     if current_user.role != 'Student':
         flash('Access restricted to students', 'error')
         return False
     return True
+
 
 def validate_lecturer_access():
     if current_user.role != 'Lecturer':
@@ -42,6 +45,7 @@ def validate_lecturer_access():
     return True
 
 
+# --- Public Routes ---
 @views_bp.route('/')
 def index():
     roles = [
@@ -56,18 +60,15 @@ def index():
 @views_bp.route('/dashboard')
 @login_required
 def dashboard():
-    # Redirect to role-specific dashboard
     role_routes = {
         'Student': 'views.student_dashboard',
         'Admin': 'views.admin_dashboard',
         'Lecturer': 'views.lecturer_dashboard',
         'Finance': 'views.finance_dashboard'
     }
-    
     route = role_routes.get(current_user.role)
     if route:
         return redirect(url_for(route))
-    
     return render_template('index.html')
 
 
@@ -225,7 +226,7 @@ def admin_edit_user(user_id):
 
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error updating user: {str(e)}")
+            logger.error(f"Error updating user: {str(e)}")
             flash('Error updating user. Please try again.', 'error')
             return render_template('admin_edit_user.html', user=user)
 
@@ -261,7 +262,7 @@ def admin_delete_user(user_id):
 
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error deleting user: {str(e)}")
+        logger.error(f"Error deleting user: {str(e)}")
         flash('Error deleting user. Please try again.', 'error')
 
     return redirect(url_for('views.admin_dashboard'))
@@ -382,7 +383,7 @@ def admin_edit_course(course_id):
 
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error updating course: {str(e)}")
+            logger.error(f"Error updating course: {str(e)}")
             flash('Error updating course. Please try again.', 'error')
             return render_template('admin_edit_course.html',
                                  course=course,
@@ -411,15 +412,13 @@ def admin_delete_course(course_id):
 
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Error deleting course: {str(e)}")
+        logger.error(f"Error deleting course: {str(e)}")
         flash('Error deleting course. Please try again.', 'error')
 
     return redirect(url_for('views.admin_dashboard'))
 
 
 # --- Student Routes ---
-
-
 @views_bp.route('/student/dashboard')
 @login_required
 def student_dashboard():
@@ -428,57 +427,16 @@ def student_dashboard():
         return redirect(url_for('views.dashboard'))
     
     student = current_user.student
-    
-    # Check financial clearance
     is_cleared = is_financially_cleared(student.id)
-    
-    # Get recent payments
-    payments = Payment.query.filter_by(
-        student_id=student.id
-    ).order_by(Payment.date_paid.desc()).limit(10).all()
-    
-    # Get registered courses
+    payments = Payment.query.filter_by(student_id=student.id).order_by(Payment.date_paid.desc()).limit(10).all()
     registered_courses = [reg.course for reg in student.registrations]
-    
-    # Debug: Print balance to console
-    print(f"Student {current_user.name} balance: {student.balance}")
     
     return render_template('student_dashboard.html',
                          student=student,
                          registered_courses=registered_courses,
                          financial_cleared=is_cleared,
-                         balance=student.balance,  # Always pass balance
-                         payments=payments)@views_bp.route('/student/dashboard')
-@login_required
-def student_dashboard():
-    if current_user.role != 'Student':
-        flash("Access denied.", "danger")
-        return redirect(url_for('views.dashboard'))
-    
-    student = current_user.student
-    
-    # Check financial clearance
-    is_cleared = is_financially_cleared(student.id)
-    
-    # Get recent payments
-    payments = Payment.query.filter_by(
-        student_id=student.id
-    ).order_by(Payment.date_paid.desc()).limit(10).all()
-    
-    # Get registered courses
-    registered_courses = [reg.course for reg in student.registrations]
-    
-    # Debug: Print balance to console
-    print(f"Student {current_user.name} balance: {student.balance}")
-    
-    return render_template('student_dashboard.html',
-                         student=student,
-                         registered_courses=registered_courses,
-                         financial_cleared=is_cleared,
-                         balance=student.balance,  # Always pass balance
+                         balance=student.balance,
                          payments=payments)
-
-
 
 
 @views_bp.route('/student/register_course', methods=['GET', 'POST'])
@@ -535,8 +493,6 @@ def student_register_course():
                          registered_courses=registered_course_ids)
 
 
-
-
 @views_bp.route('/student/results')
 @login_required
 def student_results():
@@ -549,15 +505,12 @@ def student_results():
         return redirect(url_for('auth.logout'))
 
     try:
-        # Get all scores for the current student
         all_scores = Score.query.filter_by(student_id=student.id).all()
         
-        # Define function to calculate grade points safely
         def calculate_grade_point(score):
             try:
                 if not score.course:
                     return 0.0
-                
                 ca = float(score.ca_score) if score.ca_score is not None else 0.0
                 exam = float(score.exam_score) if score.exam_score is not None else 0.0
                 total = ca + exam
@@ -575,24 +528,20 @@ def student_results():
                     return 1.0 * units
                 return 0.0
             except Exception as e:
-                logging.error(f"Error calculating grade point: {e}")
+                logger.error(f"Error calculating grade point: {e}")
                 return 0.0
 
-        # Organize results by session and semester
         results_by_session_semester = {}
         for score in all_scores:
             if score.course:
                 session = score.course.session
                 semester = score.course.semester
-
                 if session not in results_by_session_semester:
                     results_by_session_semester[session] = {}
                 if semester not in results_by_session_semester[session]:
                     results_by_session_semester[session][semester] = []
-
                 results_by_session_semester[session][semester].append(score)
 
-        # Calculate GPA for each semester and overall CGPA
         gpa_by_session_semester = {}
         overall_total_points = 0.0
         overall_total_units = 0.0
@@ -602,26 +551,19 @@ def student_results():
             for semester, scores in semesters.items():
                 total_points = 0.0
                 total_units = 0.0
-                
                 for score in scores:
                     points = calculate_grade_point(score)
                     units = float(score.course.unit) if score.course and score.course.unit else 0.0
                     total_points += points
                     total_units += units
-                
                 gpa = round(total_points / total_units, 2) if total_units > 0 else 0.0
                 gpa_by_session_semester[session][semester] = gpa
-
                 overall_total_points += total_points
                 overall_total_units += total_units
 
-        # Calculate CGPA
         cgpa = round(overall_total_points / overall_total_units, 2) if overall_total_units > 0 else 0.0
-
-        # Determine final grade
         final_grade = "DISTINCTION" if cgpa >= 3.0 else "PASS"
         
-        # Calculate total courses count
         total_courses = 0
         for session, semesters in results_by_session_semester.items():
             for semester, scores in semesters.items():
@@ -634,13 +576,11 @@ def student_results():
             cgpa=cgpa,
             final_grade=final_grade,
             student=student,
-            total_courses=total_courses  # Add this line
+            total_courses=total_courses
         )
 
     except Exception as e:
-        logging.error(f"Error loading student results: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error loading student results: {str(e)}")
         flash('Error loading results. Please try again.', 'error')
         return redirect(url_for('views.student_dashboard'))
 
@@ -721,7 +661,7 @@ def lecturer_upload_score(course_id):
             return redirect(url_for('views.lecturer_upload_score', course_id=course_id))
         except Exception as e:
             db.session.rollback()
-            logging.error(f"Error uploading scores: {str(e)}")
+            logger.error(f"Error uploading scores: {str(e)}")
             flash('Error uploading scores. Please try again.', 'error')
             return redirect(url_for('views.lecturer_upload_score', course_id=course_id))
 
@@ -739,13 +679,8 @@ def finance_dashboard():
         flash("Access denied.", "danger")
         return redirect(url_for('views.dashboard'))
     
-    # Get all payments
     payments = Payment.query.order_by(Payment.date_paid.desc()).limit(50).all()
-    
-    # Get students with balances
     students_with_balance = Student.query.filter(Student.balance > 0).all()
-    
-    # Calculate totals
     total_revenue = db.session.query(db.func.sum(Payment.amount)).filter(Payment.status == 'Success').scalar() or 0
     
     return render_template('finance_dashboard.html',
@@ -769,7 +704,6 @@ def make_payment():
             flash("Invalid amount.", "danger")
             return redirect(url_for('views.make_payment'))
         
-        # Create payment record
         payment = Payment(
             student_id=current_user.student.id,
             amount=amount,
@@ -778,9 +712,7 @@ def make_payment():
             date_paid=datetime.utcnow()
         )
         
-        # Update student balance
         current_user.student.balance -= amount
-        
         db.session.add(payment)
         db.session.commit()
         
